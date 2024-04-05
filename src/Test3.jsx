@@ -4,6 +4,7 @@ import JSZip from "jszip";
 
 function Test3() {
   const [folderData, setFolderData] = useState([]);
+  const [filesData, setFilesData] = useState([]);
 
   useEffect(() => {
     const fetchAndProcessFiles = async () => {
@@ -34,14 +35,11 @@ function Test3() {
               continue;
             }
 
-            if (parentFolder === "" && entry.dir) {
-              // If it's the root folder and the entry is a directory
-              folders.push({ name: fullPath });
-            } else if (entry.dir) {
+            if (entry.dir) {
               const nestedData = await processZipEntries(entry, fullPath);
+              folders.push({ name: fullPath, type: "folder" });
               folders.push(...nestedData.folders);
               files.push(...nestedData.files);
-              folders.push({ name: fullPath });
             } else {
               const data = await entry.async("blob");
               if (fullPath.match(/\.(jpg|jpeg|png|gif)$/i)) {
@@ -51,10 +49,13 @@ function Test3() {
                   type: "image",
                 });
               } else if (fullPath.endsWith(".pdf")) {
+                const blob = new Blob([data], { type: "application/pdf" });
+                const url = URL.createObjectURL(blob);
                 files.push({
                   name: fullPath,
-                  blob: URL.createObjectURL(data),
-                  type: "pdf",
+                  blob: blob,
+                  url: url,
+                  type: "application/pdf",
                 });
               }
             }
@@ -65,6 +66,7 @@ function Test3() {
 
         const { folders, files } = await processZipEntries(zip);
         setFolderData(folders);
+        setFilesData(files);
       } catch (error) {
         console.error(error);
       }
@@ -73,7 +75,9 @@ function Test3() {
     fetchAndProcessFiles();
   }, []);
 
-  console.log(folderData);
+  console.log("sass", filesData);
+
+  console.log("fop", folderData);
   return (
     <>
       <div>
@@ -87,6 +91,19 @@ function Test3() {
             </Link>
           </li>
         ))}
+
+        <ul>
+          {filesData.map(
+            (file, index) =>
+              file.type === "application/pdf" && (
+                <li key={index}>
+                  <a href={file.url} target="_blank" rel="noopener noreferrer">
+                    {file.name}
+                  </a>
+                </li>
+              )
+          )}
+        </ul>
       </div>
     </>
   );

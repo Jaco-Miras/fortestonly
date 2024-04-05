@@ -1,5 +1,4 @@
 import React from "react";
-import Test3 from "./Test3";
 import { Routers } from "./Routes/Routes";
 
 const App = () => {

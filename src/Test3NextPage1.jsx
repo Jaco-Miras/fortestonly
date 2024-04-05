@@ -12,7 +12,7 @@ const Test3NextPage1 = () => {
 
   useEffect(() => {
     // Filter files based on folderName
-    const filtered = filesData1.filter((file) =>
+    const filteredFilesData1 = filesData1.filter((file) =>
       decodeURIComponent(file.name).startsWith(folderName)
     );
 
@@ -21,39 +21,23 @@ const Test3NextPage1 = () => {
       decodeURIComponent(file.name).startsWith(folderName)
     );
 
-    // If there are no images in the folder and subfolders, filter out all files
+    // If there are no images in the folder, filter out all files except folders
     if (!hasImagesInFolder) {
-      setFilteredFiles([]);
+      const filteredFolders = filteredFilesData1.filter(
+        (file) => file.name !== folderName
+      );
+      setFilteredFiles(filteredFolders);
       return; // Exit early if no images in the folder
     }
 
-    // If the folder contains subfolders, show only subfolders
-    if (filesData1 && filesData1.length > 0) {
-      // Get the list of subfolders for the current folder
-      const subFolders = filesData1.filter((file) =>
-        file.name.startsWith(folderName)
-      );
-
-      // If there are subfolders, show only subfolders
-      if (subFolders.length > 0) {
-        setFilteredFiles(subFolders);
-      } else {
-        // If no subfolders, show all files (images)
-        setFilteredFiles(filtered);
-      }
-    } else {
-      // If no subfolders, show all files (images)
-      setFilteredFiles(filtered);
-    }
-
     // If the folder contains image files, add them to the filtered files
-    if (filesData2 && filesData2.length > 0) {
-      const imageFiles = filesData2.filter((file) =>
-        decodeURIComponent(file.name).startsWith(folderName)
-      );
-      setFilteredFiles((prevFiles) => [...prevFiles, ...imageFiles]);
-    }
-  }, [folderName, filesData1]);
+    const filteredImages = filesData2.filter(
+      (file) =>
+        decodeURIComponent(file.name).startsWith(folderName) &&
+        !file.name.substring(folderName.length + 1).includes("/")
+    );
+    setFilteredFiles(filteredImages);
+  }, [folderName, filesData1, filesData2]);
 
   useEffect(() => {
     const fetchAndProcessFiles = async () => {
@@ -71,12 +55,12 @@ const Test3NextPage1 = () => {
           for (const path in folder.files) {
             const entry = folder.files[path];
             const fullPath = parentFolder ? `${parentFolder}/${path}` : path;
-            if (entry.dir) {
+            if (entry.dir && fullPath.startsWith(folderName)) {
               const nestedData = await processZipEntries(entry, fullPath);
               folders.push(...nestedData.folders);
               files.push(...nestedData.files);
               folders.push({ name: fullPath });
-            } else {
+            } else if (!entry.dir && fullPath.startsWith(folderName)) {
               const data = await entry.async("blob");
               if (fullPath.match(/\.(jpg|jpeg|png|gif)$/i)) {
                 files.push({
@@ -85,9 +69,12 @@ const Test3NextPage1 = () => {
                   type: "image",
                 });
               } else if (fullPath.endsWith(".pdf")) {
+                const blob = new Blob([data], { type: "application/pdf" });
+                const url = URL.createObjectURL(blob);
                 files.push({
                   name: fullPath,
-                  blob: URL.createObjectURL(data),
+                  blob: blob,
+                  url: url,
                   type: "application/pdf",
                 });
               }
@@ -97,12 +84,8 @@ const Test3NextPage1 = () => {
         };
 
         const { folders, files } = await processZipEntries(zip);
-        // Filter filesData2 based on the folderName
-        const filteredFilesData2 = files.filter((file) =>
-          decodeURIComponent(file.name).startsWith(folderName)
-        );
         setFilesData1(folders);
-        setFilesData2(filteredFilesData2);
+        setFilesData2(files);
       } catch (error) {
         console.error(error);
       }
@@ -111,26 +94,32 @@ const Test3NextPage1 = () => {
     fetchAndProcessFiles();
   }, [folderName]);
 
-  console.log("files", filesData2);
+  console.log("files", filesData1);
 
-  console.log(folderName);
+  console.log("ttt", filteredFiles);
   return (
-    <div>
-      {filteredFiles.map((file, index) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-2 gap-y-3">
+      {[...filteredFiles, ...filesData1].map((file, index) => (
         <div key={index}>
           {file.type === "image" ? (
             <img src={file.blob} alt={file.name} />
           ) : file.type === "application/pdf" ? (
-            <a href={file.blob} target="_blank" rel="noopener noreferrer">
-              {file.name}
-            </a>
+            <div>
+              {/* Open PDF file in a new tab */}
+              <a href={file.url} target="_blank" rel="noopener noreferrer">
+                {file.name}
+              </a>
+            </div>
           ) : (
-            <Link
-              to={`/folder/${encodeURIComponent(file.name)}`}
-              state={{ folderName: file.name }}
-            >
-              {file.name}
-            </Link>
+            // Check if the file name is not equal to the folderName (parent folder)
+            file.name !== folderName && (
+              <Link
+                to={`/folder/${encodeURIComponent(file.name)}`}
+                state={{ folderName: file.name }}
+              >
+                {file.name}
+              </Link>
+            )
           )}
         </div>
       ))}
